@@ -27,11 +27,11 @@ def add_fstab_entry(dev, mount_point, fs_type):
     new_fstab = []
     with open("/etc/fstab") as f:
         for l in f.readlines():
-            if l.startswith(dev):
-                new_fstab.append(FSTAB_TMPL.format(dev=dev, fs_type=fs_type,
-                                                   mount_point=mount_point))
-            else:
+            # Filter out the already existing entry
+            if not l.startswith(dev):
                 new_fstab.append(l.strip())
+        new_fstab.append(FSTAB_TMPL.format(dev=dev, fs_type=fs_type,
+                                           mount_point=mount_point))
     if new_fstab:
         with open("/etc/fstab", "w") as f:
             f.write("\n".join(new_fstab))
