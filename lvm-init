@@ -1,0 +1,62 @@
+#!/usr/bin/python
+
+import os
+import json
+import subprocess
+
+CFG = "/etc/lvm-init/lvm-init.json"
+
+def run(cmd, include_stderr=False):
+    stderr = None
+    if include_stderr:
+        stderr = subprocess.STDOUT
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr, shell=True)
+    proc.wait()
+    output = proc.stdout.read()
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+    return output
+
+
+def main():
+    if not os.path.exists(CFG):
+        print "Config %s does not exist, exiting." % CFG
+        return
+    try:
+        config = json.load(open(CFG))
+    except:
+        print "Error loading config %s" % CFG
+        raise
+    if not "lvm" in config:
+        print "No lvm section in %s, exiting" % CFG
+        return
+    lvm = config["lvm"]
+    # check if it's ok
+    devs = lvm["pvcreate"].split()
+    lvm_setup_done = True
+    for dev in devs:
+        out = run("blkid -c /dev/null %s" % dev)
+        if not "LVM2_member" in out:
+            lvm_setup_done = False
+    if lvm_setup_done:
+        print "LVM is ok, exiting"
+        return
+    run("pvcreate %s" % lvm["pvcreate"])
+    for vg, devices in lvm["vgcreate"].items():
+        run("vgcreate %s %s" % (vg, devices))
+    for lv, lv_config in lvm["lvcreate"].items():
+        run("lvcreate -n {lv} {params} {vg}".format(lv=lv, params=lv_config["params"], vg=lv_config["vg"]))
+        if lv_config.get("format_as"):
+            fs_type = lv_config["format_as"]
+            dev = "/dev/%s/%s" % (lv_config["vg"], lv)
+            mount_point = lv_config["mount_point"]
+            run('/sbin/mkfs.{fs_type} {dev}'.format(fs_type=fs_type, dev=dev))
+            run("sed -i -e 's,^%s.*,,' /etc/fstab" % dev)
+            run("echo '{dev} {mount_point} {fs_type} defaults,noatime 0 0' >> /etc/fstab".format(
+                dev=dev, fs_type=fs_type, mount_point=mount_point))
+            run("mkdir -p %s" % mount_point)
+            run("mount -a")
+
+
+if __name__ == "__main__":
+    main()
