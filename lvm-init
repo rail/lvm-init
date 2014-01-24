@@ -17,6 +17,21 @@ def run(cmd, include_stderr=False):
         raise subprocess.CalledProcessError(proc.returncode, cmd)
     return output
 
+def add_fstab_entry(dev, mount_point, fs_type):
+    fstab = None
+    new_fstab = []
+    with open("/etc/fstab") as f:
+        for l in f.readlines():
+            if l.startswith(dev):
+                new_fstab.append("{dev} {mount_point} {fs_type} defaults,noatime 0 0".format(
+                    dev=dev, fs_type=fs_type, mount_point=mount_point))
+            else:
+                new_fstab.append(l.strip())
+    if new_fstab:
+        with open("/etc/fstab", "w") as f:
+            f.write("\n".join(new_fstab))
+            f.write("\n")
+
 
 def main():
     if not os.path.exists(CFG):
@@ -30,8 +45,8 @@ def main():
     if not "lvm" in config:
         print "No lvm section in %s, exiting" % CFG
         return
+
     lvm = config["lvm"]
-    # check if it's ok
     devs = lvm["pvcreate"].split()
     lvm_setup_done = True
     for dev in devs:
@@ -51,9 +66,7 @@ def main():
             dev = "/dev/%s/%s" % (lv_config["vg"], lv)
             mount_point = lv_config["mount_point"]
             run('/sbin/mkfs.{fs_type} {dev}'.format(fs_type=fs_type, dev=dev))
-            run("sed -i -e 's,^%s.*,,' /etc/fstab" % dev)
-            run("echo '{dev} {mount_point} {fs_type} defaults,noatime 0 0' >> /etc/fstab".format(
-                dev=dev, fs_type=fs_type, mount_point=mount_point))
+            add_fstab_entry(dev, mount_point, fs_type)
             run("mkdir -p %s" % mount_point)
             run("mount -a")
 
