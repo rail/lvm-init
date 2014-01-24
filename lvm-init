@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# TODO: syslog
 
 import os
 import json
