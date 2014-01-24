@@ -33,11 +33,9 @@ def add_fstab_entry(dev, mount_point, fs_type):
             else:
                 new_fstab.append(l.strip())
     if new_fstab:
-        syslog("Updating /etc/fstab")
         with open("/etc/fstab", "w") as f:
             f.write("\n".join(new_fstab))
             f.write("\n")
-        syslog("New /etc/fstab created")
 
 
 def main():
@@ -69,16 +67,13 @@ def main():
         return
     syslog("Creating new physical volumes: %s" % lvm["pvcreate"])
     run("/sbin/pvcreate %s" % lvm["pvcreate"])
-    syslog("Created physical volumes: %s" % lvm["pvcreate"])
     for vg, devices in lvm["vgcreate"].items():
         syslog("Creating new volume group %s using %s" % (vg, devices))
         run("/sbin/vgcreate %s %s" % (vg, devices))
-        syslog("Created volume group %s using %s" % (vg, devices))
     for lv, lv_config in lvm["lvcreate"].items():
         syslog("Creating new logical volume %s" % lv)
         run("/sbin/lvcreate -n {lv} {params} {vg}".format(
             lv=lv, params=lv_config["params"], vg=lv_config["vg"]))
-        syslog("Created new logical volume %s" % lv)
         if lv_config.get("format_as"):
             fs_type = lv_config["format_as"]
             dev = "/dev/%s/%s" % (lv_config["vg"], lv)
@@ -86,12 +81,10 @@ def main():
             syslog("Formatting %s" % dev)
             run('/sbin/mkfs.{fs_type} {dev}'.format(fs_type=fs_type,
                                                     dev=dev))
-            syslog("Formatted %s" % dev)
             add_fstab_entry(dev, mount_point, fs_type)
             run("/bin/mkdir -p %s" % mount_point)
             syslog("Mounting %s" % mount_point)
             run("/bin/mount -a")
-            syslog("Mounted %s" % mount_point)
 
 
 if __name__ == "__main__":
