@@ -27,7 +27,7 @@ rm -rf $RPM_BUILD_ROOT
 
 mkdir -p $RPM_BUILD_ROOT/%{_sysconfdir}/lvm-init
 
-install -m0755 -D lvm-init $RPM_BUILD_ROOT/sbin/lvm-init
+install -m0755 -D lvm-init.py $RPM_BUILD_ROOT/sbin/lvm-init
 install -m0755 -D init.d $RPM_BUILD_ROOT/%{_initddir}/lvm-init
 
 
