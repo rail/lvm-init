@@ -1,11 +1,12 @@
 #!/usr/bin/python
-# TODO: syslog
 
 import os
 import json
 import subprocess
+from syslog import openlog, syslog, LOG_ERR, LOG_WARNING
 
 CFG = "/etc/lvm-init/lvm-init.json"
+openlog("lvm-init")
 
 def run(cmd, include_stderr=False):
     stderr = None
@@ -29,6 +30,7 @@ def add_fstab_entry(dev, mount_point, fs_type):
             else:
                 new_fstab.append(l.strip())
     if new_fstab:
+        syslog("Updating /etc/fstab")
         with open("/etc/fstab", "w") as f:
             f.write("\n".join(new_fstab))
             f.write("\n")
@@ -36,15 +38,15 @@ def add_fstab_entry(dev, mount_point, fs_type):
 
 def main():
     if not os.path.exists(CFG):
-        print "Config %s does not exist, exiting." % CFG
+        syslog(LOG_ERR, "Config %s does not exist, exiting." % CFG)
         return
     try:
         config = json.load(open(CFG))
     except:
-        print "Error loading config %s" % CFG
+        syslog(LOG_ERR, "Error loading config %s" % CFG)
         raise
     if not "lvm" in config:
-        print "No lvm section in %s, exiting" % CFG
+        syslog(LOG_WARNING, "No lvm section in %s, exiting" % CFG)
         return
 
     lvm = config["lvm"]
@@ -55,18 +57,22 @@ def main():
         if not "LVM2_member" in out:
             lvm_setup_done = False
     if lvm_setup_done:
-        print "LVM is ok, exiting"
+        syslog("LVM is ok, exiting")
         return
+    syslog("Creating new physical volumes: %s" % lvm["pvcreate"])
     run("pvcreate %s" % lvm["pvcreate"])
     for vg, devices in lvm["vgcreate"].items():
+        syslog("Creating new volume group %s using %" % (vg, devices))
         run("vgcreate %s %s" % (vg, devices))
     for lv, lv_config in lvm["lvcreate"].items():
+        syslog("Creating new logical volume %s" % lv)
         run("lvcreate -n {lv} {params} {vg}".format(lv=lv, params=lv_config["params"], vg=lv_config["vg"]))
         if lv_config.get("format_as"):
             fs_type = lv_config["format_as"]
             dev = "/dev/%s/%s" % (lv_config["vg"], lv)
             mount_point = lv_config["mount_point"]
-            run('/sbin/mkfs.{fs_type} {dev}'.format(fs_type=fs_type, dev=dev))
+            syslog("Formatting %s" % dev)
+            run('/sbin/mkfs.{fs_type} {dev}'.format(printfs_type=fs_type, dev=dev))
             add_fstab_entry(dev, mount_point, fs_type)
             run("mkdir -p %s" % mount_point)
             run("mount -a")

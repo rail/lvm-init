@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Maintain compatibility with chkconfig
-# chkconfig: 12345 02 99
+# chkconfig: 12345 15 99
 # description: lvm-init
 
 ### BEGIN INIT INFO
