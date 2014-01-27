@@ -6,7 +6,8 @@ import subprocess
 from syslog import openlog, syslog, LOG_ERR, LOG_WARNING
 
 CFG = "/etc/lvm-init/lvm-init.json"
-FSTAB_TMPL = "{dev} {mount_point} {fs_type} defaults,noatime 0 0"
+DEFAULT_MOUNT_OPTS = "defaults,noatime"
+FSTAB_TMPL = "{dev} {mount_point} {fs_type} {mount_options} 0 0"
 openlog("lvm-init")
 
 
@@ -23,7 +24,7 @@ def run(cmd, include_stderr=False):
     return output
 
 
-def add_fstab_entry(dev, mount_point, fs_type):
+def add_fstab_entry(dev, mount_point, fs_type, mount_options):
     new_fstab = []
     with open("/etc/fstab") as f:
         for l in f.readlines():
@@ -31,7 +32,8 @@ def add_fstab_entry(dev, mount_point, fs_type):
             if not l.startswith(dev):
                 new_fstab.append(l.strip())
         new_fstab.append(FSTAB_TMPL.format(dev=dev, fs_type=fs_type,
-                                           mount_point=mount_point))
+                                           mount_point=mount_point,
+                                           mount_options=mount_options))
     if new_fstab:
         with open("/etc/fstab", "w") as f:
             f.write("\n".join(new_fstab))
@@ -77,11 +79,12 @@ def main():
         if lv_config.get("format_as"):
             fs_type = lv_config["format_as"]
             dev = "/dev/%s/%s" % (lv_config["vg"], lv)
+            mount_options = lv_config.get("mount_options", DEFAULT_MOUNT_OPTS)
             mount_point = lv_config["mount_point"]
             syslog("Formatting %s" % dev)
             run('/sbin/mkfs.{fs_type} {dev}'.format(fs_type=fs_type,
                                                     dev=dev))
-            add_fstab_entry(dev, mount_point, fs_type)
+            add_fstab_entry(dev, mount_point, fs_type, mount_options)
             run("/bin/mkdir -p %s" % mount_point)
             syslog("Mounting %s" % mount_point)
             run("/bin/mount %s" % mount_point)
