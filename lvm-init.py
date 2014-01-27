@@ -84,7 +84,7 @@ def main():
             add_fstab_entry(dev, mount_point, fs_type)
             run("/bin/mkdir -p %s" % mount_point)
             syslog("Mounting %s" % mount_point)
-            run("/bin/mount -a")
+            run("/bin/mount %s" % mount_point)
 
 
 if __name__ == "__main__":
